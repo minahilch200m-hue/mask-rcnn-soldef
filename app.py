@@ -3,9 +3,8 @@ import torch
 import torchvision
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 from torchvision.models.detection.mask_rcnn import MaskRCNNPredictor
-import cv2
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 
 st.title("Mask R-CNN Object Detection")
 st.write("Upload an image below to run your trained Mask R-CNN model and view the bounding boxes.")
@@ -38,30 +37,27 @@ with st.spinner("Loading Mask R-CNN model... Please wait."):
 uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
 
 if uploaded_file is not None:
-    image = Image.open(uploaded_file)
+    image = Image.open(uploaded_file).convert("RGB")
     st.image(image, caption="Uploaded Image", use_column_width=True)
     
     if st.button("Run Detection"):
         with st.spinner("Detecting objects..."):
-            image_np = np.array(image)
-            image_tensor = torchvision.transforms.functional.to_tensor(image_np).unsqueeze(0)
+            image_tensor = torchvision.transforms.functional.to_tensor(image).unsqueeze(0)
             
             with torch.no_grad():
                 predictions = model(image_tensor)
                 
             pred = predictions[0]
-            annotated_image = image_np.copy()
-            annotated_image = cv2.cvtColor(annotated_image, cv2.COLOR_RGB2BGR)
+            annotated_image = image.copy()
+            draw = ImageDraw.Draw(annotated_image)
             
             threshold = 0.5
             for i in range(len(pred['boxes'])):
                 score = pred['scores'][i].item()
                 if score > threshold:
                     box = pred['boxes'][i].cpu().numpy().astype(int)
-                    cv2.rectangle(annotated_image, (box[0], box[1]), (box[2], box[3]), (0, 255, 0), 2)
-                    text = f"{score:.2f}"
-                    cv2.putText(annotated_image, text, (box[0], box[1] - 10), 
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                    # Draw bounding box using PIL
+                    draw.rectangle([box[0], box[1], box[2], box[3]], outline="green", width=3)
+                    draw.text((box[0], max(0, box[1] - 15)), f"{score:.2f}", fill="green")
                                 
-            annotated_image = cv2.cvtColor(annotated_image, cv2.COLOR_BGR2RGB)
             st.image(annotated_image, caption="Detected Output with Bounding Boxes", use_column_width=True)
